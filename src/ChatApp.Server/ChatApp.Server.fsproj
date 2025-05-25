@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ChatApp.Domain\ChatApp.Domain.fsproj" />
+    <ProjectReference Include="..\ChatApp.Application\ChatApp.Application.fsproj" />
+    <ProjectReference Include="..\ChatApp.Infrastructure\ChatApp.Infrastructure.fsproj" />
+  </ItemGroup>
+
+</Project>
