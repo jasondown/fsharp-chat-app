@@ -13,4 +13,8 @@
     <ProjectReference Include="..\ChatApp.Domain\ChatApp.Domain.fsproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="FsToolkit.ErrorHandling" Version="4.18.0" />
+  </ItemGroup>
+
 </Project>
