@@ -10,9 +10,9 @@ open FsToolkit.ErrorHandling
 type IRoomRepository =
     abstract GetRoom: string -> Result<Room, CommandError>
     abstract CreateRoom: RoomName -> Result<Room, CommandError>  
-    abstract AddMessageToRoom: string -> Message -> Result<Room, CommandError>
-    abstract AddUserToRoom: string -> UserHandle -> Result<Room, CommandError>
-    abstract RemoveUserFromRoom: string -> UserHandle -> Result<Room, CommandError>
+    abstract AddMessageToRoom: roomName:string * message:Message -> Result<Room, CommandError>
+    abstract AddUserToRoom: roomName:string * userHandle:UserHandle -> Result<Room, CommandError>
+    abstract RemoveUserFromRoom: roomName:string * userHandle:UserHandle -> Result<Room, CommandError>
     abstract ListRooms: unit -> Result<(RoomName * int) list, CommandError>
 
 /// Main chat service for handling application logic
@@ -26,7 +26,7 @@ type ChatService(roomRepository: IRoomRepository) =
     member _.SendMessage(userHandle: string, roomName: string, messageContent: string) : Result<Message, CommandError> =
         result {
             let! message = Commands.sendMessage userHandle roomName messageContent roomRepository.GetRoom
-            let! _ = roomRepository.AddMessageToRoom (RoomName.value message.Room) message
+            let! _ = roomRepository.AddMessageToRoom(RoomName.value message.Room, message)
             return message
         }
     
@@ -51,7 +51,7 @@ type ChatService(roomRepository: IRoomRepository) =
             let! room = RoomName.create roomName
                         |> Result.mapError ValidationError
             
-            let! _ = roomRepository.RemoveUserFromRoom (RoomName.value room) handle
+            let! _ = roomRepository.RemoveUserFromRoom(RoomName.value room, handle)
             
             return room
         }
