@@ -12,23 +12,23 @@ module UserHandleTests =
         let result = UserHandle.create "alice-123"
         match result with
         | Ok handle -> Assert.Equal("alice-123", UserHandle.value handle)
-        | Error err -> Assert.Fail(sprintf "Expected success but got error: %A" err)
+        | Error err -> Assert.Fail($"Expected success but got error: {err}")
     
     [<Fact>]
     let ``UserHandle.create fails with empty input`` () =
         let result = UserHandle.create ""
         match result with
         | Error EmptyUserHandle -> () // Expected
-        | Ok handle -> Assert.Fail(sprintf "Expected failure but got: %A" handle)
-        | Error err -> Assert.Fail(sprintf "Expected EmptyUserHandle but got: %A" err)
+        | Ok handle -> Assert.Fail($"Expected failure but got: {handle}")
+        | Error err -> Assert.Fail($"Expected EmptyUserHandle but got: {err}")
     
     [<Fact>]
     let ``UserHandle.create fails with invalid characters`` () =
         let result = UserHandle.create "alice@123"
         match result with
         | Error (InvalidUserHandleChars _) -> () // Expected
-        | Ok handle -> Assert.Fail(sprintf "Expected failure but got: %A" handle)
-        | Error err -> Assert.Fail(sprintf "Expected InvalidUserHandleChars but got: %A" err)
+        | Ok handle -> Assert.Fail($"Expected failure but got: {handle}")
+        | Error err -> Assert.Fail($"Expected InvalidUserHandleChars but got: {err}")
 
 /// Tests for the RoomName validation logic
 module RoomNameTests =
@@ -38,23 +38,23 @@ module RoomNameTests =
         let result = RoomName.create "general-chat"
         match result with
         | Ok room -> Assert.Equal("general-chat", RoomName.value room)
-        | Error err -> Assert.Fail(sprintf "Expected success but got error: %A" err)
+        | Error err -> Assert.Fail($"Expected success but got error: {err}")
     
     [<Fact>]
     let ``RoomName.create fails with empty input`` () =
         let result = RoomName.create ""
         match result with
         | Error EmptyRoomName -> () // Expected
-        | Ok room -> Assert.Fail(sprintf "Expected failure but got: %A" room)
-        | Error err -> Assert.Fail(sprintf "Expected EmptyRoomName but got: %A" err)
+        | Ok room -> Assert.Fail($"Expected failure but got: {room}")
+        | Error err -> Assert.Fail($"Expected EmptyRoomName but got: {err}")
     
     [<Fact>]
     let ``RoomName.create fails with invalid characters`` () =
         let result = RoomName.create "general chat"  // space is invalid
         match result with
         | Error (InvalidRoomNameChars _) -> () // Expected
-        | Ok room -> Assert.Fail(sprintf "Expected failure but got: %A" room)
-        | Error err -> Assert.Fail(sprintf "Expected InvalidRoomNameChars but got: %A" err)
+        | Ok room -> Assert.Fail($"Expected failure but got: {room}")
+        | Error err -> Assert.Fail($"Expected InvalidRoomNameChars but got: {err}")
 
 /// Tests for the MessageContent validation logic  
 module MessageContentTests =
@@ -64,15 +64,15 @@ module MessageContentTests =
         let result = MessageContent.create "Hello, world!"
         match result with
         | Ok content -> Assert.Equal("Hello, world!", MessageContent.value content)
-        | Error err -> Assert.Fail(sprintf "Expected success but got error: %A" err)
+        | Error err -> Assert.Fail($"Expected success but got error: {err}")
     
     [<Fact>]
     let ``MessageContent.create fails with empty input`` () =
         let result = MessageContent.create ""
         match result with
         | Error EmptyMessageContent -> () // Expected
-        | Ok content -> Assert.Fail(sprintf "Expected failure but got: %A" content)
-        | Error err -> Assert.Fail(sprintf "Expected EmptyMessageContent but got: %A" err)
+        | Ok content -> Assert.Fail($"Expected failure but got: {content}")
+        | Error err -> Assert.Fail($"Expected EmptyMessageContent but got: {err}")
     
     [<Fact>]
     let ``MessageContent.create fails with too long input`` () =
@@ -80,5 +80,5 @@ module MessageContentTests =
         let result = MessageContent.create veryLongMessage
         match result with
         | Error (MessageContentTooLong _) -> () // Expected
-        | Ok content -> Assert.Fail(sprintf "Expected failure but got: %A" content)
-        | Error err -> Assert.Fail(sprintf "Expected MessageContentTooLong but got: %A" err)
+        | Ok content -> Assert.Fail($"Expected failure but got: {content}")
+        | Error err -> Assert.Fail($"Expected MessageContentTooLong but got: {err}")
