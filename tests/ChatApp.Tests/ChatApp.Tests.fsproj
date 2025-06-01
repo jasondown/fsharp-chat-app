@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <Compile Include="DomainTests.fs" />
+    <Compile Include="InfrastructureTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -23,6 +24,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ChatApp.Domain\ChatApp.Domain.fsproj" />
+    <ProjectReference Include="..\..\src\ChatApp.Application\ChatApp.Application.fsproj" />
+    <ProjectReference Include="..\..\src\ChatApp.Infrastructure\ChatApp.Infrastructure.fsproj" />
   </ItemGroup>
 
 </Project>
