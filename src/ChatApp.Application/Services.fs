@@ -20,7 +20,16 @@ type ChatService(roomRepository: IRoomRepository) =
     
     /// Join a room
     member _.JoinRoom(userHandle: string, roomName: string) : Result<RoomName * Message list, CommandError> =
-        Commands.joinRoom userHandle roomName roomRepository.GetRoom
+        result {
+            let! roomNameAndHistory = Commands.joinRoom userHandle roomName roomRepository.GetRoom
+            let roomName, messageHistory = roomNameAndHistory
+            
+            // Add the user to the room participants
+            let! userHandle = UserHandle.create userHandle |> Result.mapError ValidationError
+            let! _ = roomRepository.AddUserToRoom(RoomName.value roomName, userHandle)
+            
+            return (roomName, messageHistory)
+        }
     
     /// Send a message
     member _.SendMessage(userHandle: string, roomName: string, messageContent: string) : Result<Message, CommandError> =
