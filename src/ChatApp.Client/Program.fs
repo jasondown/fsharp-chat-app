@@ -1,2 +1,48 @@
-﻿// For more information see https://aka.ms/fsharp-console-apps
-printfn "Hello from F#"
+module ChatApp.Client.Program
+
+open System.Threading
+open ChatApp.Client.Args
+
+[<EntryPoint>]
+let main argv =
+    try
+        let args = parseArgs argv
+        
+        let username = args.GetResult Username
+        
+        // Default values
+        let host = args.TryGetResult Host |> Option.defaultValue "localhost"
+        let port = args.TryGetResult Port |> Option.defaultValue 5000
+        
+        printfn "F# Chat Client"
+        printfn $"Connecting to {host}:{port} as '{username}'..."
+        
+        use client = new ChatClient(host, port)
+        
+        if not (client.Connect()) then
+            printfn "Failed to connect. Exiting..."
+            1
+        else
+            // Check if we need to join a room right away
+            match args.TryGetResult Room with
+            | Some roomName ->
+                if not (client.JoinRoom(username, roomName)) then
+                    printfn $"Failed to join room '{roomName}'"
+            | None -> ()
+            
+            use ui = new TerminalUI.TerminalUI(client)
+            ui.Start()
+            
+            // If no room specified, join manually
+            if args.TryGetResult Room = None then
+                client.ListRooms() |> ignore
+            
+            // Wait for UI to complete (when user quits)
+            while ui.GetType().GetProperty("Running").GetValue(ui) :?> bool do
+                Thread.Sleep(100)
+            
+            0
+            
+    with ex ->
+        printfn $"Error: {ex.Message}"
+        1
