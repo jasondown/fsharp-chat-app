@@ -59,11 +59,7 @@ type ConnectionManager(logger: ILogger) =
                         let userJoinedMsg = UserJoined (userHandle, roomName)
                         inbox.Post(BroadcastToRoom (roomName, userJoinedMsg))
                         
-                        // Add user to room in our service 
-                        match chatService.LeaveRoom(UserHandle.value userHandle, RoomName.value roomName) with
-                        | Result.Ok _ -> ()
-                        | Result.Error err -> logger.Warning("Failed to track user in room: {Error}", err)
-                        
+                        // Update connection to track user and room
                         return { connection with UserHandle = Some userHandle; CurrentRoom = Some roomName }
                     | Result.Error err ->
                         let errorMsg = ServerMessage.Error $"Failed to join room: {err}"

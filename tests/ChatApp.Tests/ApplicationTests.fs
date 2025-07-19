@@ -127,3 +127,30 @@ module ChatServiceTests =
             Assert.Equal(0, room2Count)
             
         | Result.Error err -> Assert.Fail($"Expected success but got: {err}")
+
+    [<Fact>]
+    let ``ChatService.JoinRoom should create room if it doesn't exist`` () =
+        let repository = InMemoryRoomRepository()
+        let service = ChatService(repository)
+        
+        // Room doesn't exist initially
+        match service.ListRooms() with
+        | Result.Ok rooms -> Assert.Empty(rooms)
+        | Result.Error err -> Assert.Fail($"Expected success but got error: {err}")
+        
+        // Join non-existent room should create it
+        match service.JoinRoom("alice", "new-room") with
+        | Result.Ok (roomName, messages) ->
+            Assert.Equal("new-room", RoomName.value roomName)
+            Assert.Empty(messages) // New room has no messages
+        | Result.Error err -> Assert.Fail($"Expected success but got error: {err}")
+        
+        // Room should now exist
+        match service.ListRooms() with
+        | Result.Ok roomsAfterJoin ->
+            let roomList = roomsAfterJoin |> List.toArray
+            Assert.Single(roomList) |> ignore
+            let (createdRoom, participantCount) = roomList.[0]
+            Assert.Equal("new-room", RoomName.value createdRoom)
+            Assert.Equal(1, participantCount) // Alice joined
+        | Result.Error err -> Assert.Fail($"Expected success but got error: {err}")

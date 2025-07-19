@@ -208,6 +208,16 @@ type ChatClient(host: string, port: int) =
             this.TriggerEvent(ErrorOccurred $"Invalid room name: {err}")
             false
     
+    /// Set the username for this client session
+    member this.SetUsername(username: string) =
+        match UserHandle.create username with
+        | Result.Ok userHandle ->
+            clientState <- { clientState with Username = Some userHandle }
+            true
+        | Result.Error err ->
+            this.TriggerEvent(ErrorOccurred $"Invalid username: {err}")
+            false
+    
     interface IDisposable with
         member this.Dispose() =
             this.Disconnect()

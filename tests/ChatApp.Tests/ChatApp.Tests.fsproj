@@ -12,6 +12,7 @@
     <Compile Include="InfrastructureTests.fs" />
     <Compile Include="ApplicationTests.fs" />
     <Compile Include="ServerTests.fs" />
+    <Compile Include="ClientTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
@@ -26,6 +27,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ChatApp.Domain\ChatApp.Domain.fsproj" />
+    <ProjectReference Include="..\..\src\ChatApp.Client\ChatApp.Client.fsproj" />
     <ProjectReference Include="..\..\src\ChatApp.Application\ChatApp.Application.fsproj" />
     <ProjectReference Include="..\..\src\ChatApp.Infrastructure\ChatApp.Infrastructure.fsproj" />
     <ProjectReference Include="..\..\src\ChatApp.Server\ChatApp.Server.fsproj" />

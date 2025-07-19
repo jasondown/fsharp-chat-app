@@ -132,46 +132,53 @@ type TerminalUI(client: ChatClient) as this =
     /// Parse and execute command from user input
     let executeCommand (input: string) =
         if String.IsNullOrWhiteSpace(input) then
-            () // No action for empty input
+            Console.Write("> ") // Just reshow prompt for empty input
         elif input.StartsWith("/") then
             let parts = input.TrimStart('/').Split(' ', StringSplitOptions.RemoveEmptyEntries)
             match parts with
             | [| "join"; roomName |] -> 
                 match client.State.Username with
                 | Some handle -> client.JoinRoom(UserHandle.value handle, roomName) |> ignore
-                | None -> displayError "Please set a username first"
-            | [| "leave" |] -> client.LeaveRoom() |> ignore
-            | [| "list" |] -> client.ListRooms() |> ignore
-            | [| "clear" |] -> refreshUI client.State
+                | None -> 
+                    displayError "Please set a username first"
+                    Console.Write("> ")
+            | [| "leave" |] -> 
+                client.LeaveRoom() |> ignore
+            | [| "list" |] -> 
+                client.ListRooms() |> ignore
+            | [| "clear" |] -> 
+                refreshUI client.State
+                Console.Write("> ")
             | [| "quit" |] | [| "exit" |] ->
                 running <- false
-            | _ -> displayError $"Unknown command: {input}"
+            | _ -> 
+                displayError $"Unknown command: {input}"
+                Console.Write("> ")
         else
             // Regular message
             match client.State.CurrentRoom with
-            | Some _ -> client.SendMessage(input) |> ignore
-            | None -> displayError "Join a room first to send messages"
+            | Some _ -> 
+                client.SendMessage(input) |> ignore
+                // Don't write prompt here - wait for message confirmation
+            | None -> 
+                displayError "Join a room first to send messages"
+                Console.Write("> ")
     
     /// Handle input loop
     let rec inputLoop() =
         while running && not cts.Token.IsCancellationRequested do
             let input = Console.ReadLine()
             executeCommand input
-            if running then
-                Console.Write("> ")
+            // Don't write prompt here - let events handle it or the command itself
     
     /// Handle client events
     member private _.HandleClientEvent(event: ClientEvent) =
         match event with
         | MessageReceived message ->
-            // Fix: Safely handle the case where Username is None
-            match client.State.Username with
-            | Some username when message.Author <> username ->
-                // Don't display our own messages again
-                Console.SetCursorPosition(0, Console.CursorTop)
-                Console.WriteLine($"  {formatMessage message}")
-                Console.Write("> ")
-            | _ -> ()  // Either no username yet or our own message
+            // Display all received messages (including our own for confirmation)
+            Console.SetCursorPosition(0, Console.CursorTop)
+            Console.WriteLine($"  {formatMessage message}")
+            Console.Write("> ")
         
         | JoinedRoom (roomName, _) ->
             refreshUI client.State
@@ -184,18 +191,28 @@ type TerminalUI(client: ChatClient) as this =
             Console.Write("> ")
         
         | RoomsListed _rooms ->
-            refreshUI client.State
+            // Don't refresh UI for room list - just display the rooms inline
+            Console.SetCursorPosition(0, Console.CursorTop)
+            displayRooms client.State.AvailableRooms
             Console.Write("> ")
         
         | UserJoinedRoom (handle, roomName) ->
-            Console.SetCursorPosition(0, Console.CursorTop)
-            displayNotification $"{formatUserHandle handle} joined {formatRoomName roomName}"
-            Console.Write("> ")
+            // Only show if it's not us and we're in the same room
+            match client.State.Username, client.State.CurrentRoom with
+            | Some ourHandle, Some ourRoom when handle <> ourHandle && roomName = ourRoom ->
+                Console.SetCursorPosition(0, Console.CursorTop)
+                displayNotification $"{formatUserHandle handle} joined {formatRoomName roomName}"
+                Console.Write("> ")
+            | _ -> () // Don't show our own join or joins from other rooms
         
         | UserLeftRoom (handle, roomName) ->
-            Console.SetCursorPosition(0, Console.CursorTop)
-            displayNotification $"{formatUserHandle handle} left {formatRoomName roomName}"
-            Console.Write("> ")
+            // Only show if it's not us and we're in the same room
+            match client.State.Username, client.State.CurrentRoom with
+            | Some ourHandle, Some ourRoom when handle <> ourHandle && roomName = ourRoom ->
+                Console.SetCursorPosition(0, Console.CursorTop)
+                displayNotification $"{formatUserHandle handle} left {formatRoomName roomName}"
+                Console.Write("> ")
+            | _ -> () // Don't show our own leave or leaves from other rooms
         
         | ErrorOccurred message ->
             Console.SetCursorPosition(0, Console.CursorTop)

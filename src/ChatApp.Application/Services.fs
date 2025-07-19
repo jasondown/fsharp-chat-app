@@ -18,17 +18,25 @@ type IRoomRepository =
 /// Main chat service for handling application logic
 type ChatService(roomRepository: IRoomRepository) =
     
-    /// Join a room
+    /// Join a room (create if it doesn't exist)
     member _.JoinRoom(userHandle: string, roomName: string) : Result<RoomName * Message list, CommandError> =
         result {
-            let! roomNameAndHistory = Commands.joinRoom userHandle roomName roomRepository.GetRoom
-            let roomName, messageHistory = roomNameAndHistory
+            let! userHandleObj = UserHandle.create userHandle |> Result.mapError ValidationError
+            let! roomNameObj = RoomName.create roomName |> Result.mapError ValidationError
+            
+            // Try to get the room, create it if it doesn't exist
+            let! room = 
+                match roomRepository.GetRoom(RoomName.value roomNameObj) with
+                | Result.Ok existingRoom -> Result.Ok existingRoom
+                | Result.Error (CommandError.RoomNotFound _) -> 
+                    // Room doesn't exist, create it
+                    roomRepository.CreateRoom(roomNameObj)
+                | Result.Error err -> Result.Error err
             
             // Add the user to the room participants
-            let! userHandle = UserHandle.create userHandle |> Result.mapError ValidationError
-            let! _ = roomRepository.AddUserToRoom(RoomName.value roomName, userHandle)
+            let! _ = roomRepository.AddUserToRoom(RoomName.value roomNameObj, userHandleObj)
             
-            return (roomName, messageHistory)
+            return (roomNameObj, room.Messages)
         }
     
     /// Send a message
