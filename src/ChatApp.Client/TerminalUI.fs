@@ -164,11 +164,14 @@ type TerminalUI(client: ChatClient) as this =
     member private _.HandleClientEvent(event: ClientEvent) =
         match event with
         | MessageReceived message ->
-            if message.Author <> client.State.Username.Value then
+            // Fix: Safely handle the case where Username is None
+            match client.State.Username with
+            | Some username when message.Author <> username ->
                 // Don't display our own messages again
                 Console.SetCursorPosition(0, Console.CursorTop)
                 Console.WriteLine($"  {formatMessage message}")
                 Console.Write("> ")
+            | _ -> ()  // Either no username yet or our own message
         
         | JoinedRoom (roomName, _) ->
             refreshUI client.State
@@ -223,8 +226,10 @@ type TerminalUI(client: ChatClient) as this =
             with _ -> ()
         | None -> ()
     
+    /// Property to check if UI is running
+    member _.Running = running
+    
     interface IDisposable with
         member this.Dispose() =
             this.Stop()
             cts.Dispose()
-            

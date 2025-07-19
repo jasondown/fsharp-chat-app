@@ -38,7 +38,7 @@ let main argv =
                 client.ListRooms() |> ignore
             
             // Wait for UI to complete (when user quits)
-            while ui.GetType().GetProperty("Running").GetValue(ui) :?> bool do
+            while ui.Running do
                 Thread.Sleep(100)
             
             0
