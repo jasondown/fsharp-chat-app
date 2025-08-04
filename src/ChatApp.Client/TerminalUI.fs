@@ -148,7 +148,6 @@ type TerminalUI(client: ChatClient) as this =
                 client.ListRooms() |> ignore
             | [| "clear" |] -> 
                 refreshUI client.State
-                Console.Write("> ")
             | [| "quit" |] | [| "exit" |] ->
                 running <- false
             | _ -> 
@@ -192,7 +191,6 @@ type TerminalUI(client: ChatClient) as this =
         
         | RoomsListed _rooms ->
             // Don't refresh UI for room list - just display the rooms inline
-            Console.SetCursorPosition(0, Console.CursorTop)
             displayRooms client.State.AvailableRooms
             Console.Write("> ")
         

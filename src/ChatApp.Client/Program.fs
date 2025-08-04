@@ -37,11 +37,7 @@ let main argv =
                 
                 use ui = new TerminalUI.TerminalUI(client)
                 ui.Start()
-                
-                // If no room specified, list rooms for user
-                if args.TryGetResult Room = None then
-                    client.ListRooms() |> ignore
-                
+                                
                 // Wait for UI to complete (when user quits)
                 while ui.Running do
                     Thread.Sleep(100)
