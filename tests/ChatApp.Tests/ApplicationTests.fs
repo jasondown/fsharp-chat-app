@@ -150,7 +150,36 @@ module ChatServiceTests =
         | Result.Ok roomsAfterJoin ->
             let roomList = roomsAfterJoin |> List.toArray
             Assert.Single(roomList) |> ignore
-            let (createdRoom, participantCount) = roomList.[0]
+            let createdRoom, participantCount = roomList[0]
             Assert.Equal("new-room", RoomName.value createdRoom)
             Assert.Equal(1, participantCount) // Alice joined
         | Result.Error err -> Assert.Fail($"Expected success but got error: {err}")
+    
+    [<Fact>]
+    let ``ChatService.GetRoom should return existing room`` () =
+        let chatService = ChatService(InMemoryRoomRepository())
+        let roomName = "get-room-test"
+        
+        // Create the room
+        chatService.CreateRoom(roomName) |> ignore
+        
+        // Get the room
+        let result = chatService.GetRoom(roomName)
+        
+        match result with
+        | Result.Ok room ->
+            Assert.Equal(roomName, RoomName.value room.Name)
+            Assert.Empty(room.Messages)
+            Assert.Empty(room.Participants)
+        | Result.Error err -> Assert.Fail($"Expected success but got: {err}")
+    
+    [<Fact>]
+    let ``ChatService.GetRoom should return error for non-existent room`` () =
+        let chatService = ChatService(InMemoryRoomRepository())
+        
+        let result = chatService.GetRoom("non-existent-room")
+        
+        match result with
+        | Result.Error (CommandError.RoomNotFound _) -> () // Expected
+        | Result.Ok room -> Assert.Fail($"Expected error but got room: {room.Name}")
+        | Result.Error err -> Assert.Fail($"Expected RoomNotFound but got: {err}")
