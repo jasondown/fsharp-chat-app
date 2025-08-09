@@ -12,6 +12,7 @@ module Protocol =
         | SendMessage of UserHandle * RoomName * MessageContent
         | ListRooms
         | GetRoomHistory of RoomName
+        | ListUsers of RoomName option  // None = current room, Some = specific room
     
     /// Server responses and events sent to clients
     type ServerMessage =
@@ -21,6 +22,7 @@ module Protocol =
         | RoomList of (RoomName * int) list      // Room names with participant counts
         | UserJoined of UserHandle * RoomName    // Another user joined the room  
         | UserLeft of UserHandle * RoomName      // Another user left the room
+        | UserList of RoomName * UserHandle list // Users in a specific room
         | Error of string                        // Error message
     
     /// Connection state events
