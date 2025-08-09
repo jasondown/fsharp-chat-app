@@ -175,7 +175,6 @@ type TerminalUI(client: ChatClient) as this =
         match event with
         | MessageReceived message ->
             // Display all received messages (including our own for confirmation)
-            Console.SetCursorPosition(0, Console.CursorTop)
             Console.WriteLine($"  {formatMessage message}")
             Console.Write("> ")
         
@@ -198,7 +197,6 @@ type TerminalUI(client: ChatClient) as this =
             // Only show if it's not us and we're in the same room
             match client.State.Username, client.State.CurrentRoom with
             | Some ourHandle, Some ourRoom when handle <> ourHandle && roomName = ourRoom ->
-                Console.SetCursorPosition(0, Console.CursorTop)
                 displayNotification $"{formatUserHandle handle} joined {formatRoomName roomName}"
                 Console.Write("> ")
             | _ -> () // Don't show our own join or joins from other rooms
@@ -207,18 +205,15 @@ type TerminalUI(client: ChatClient) as this =
             // Only show if it's not us and we're in the same room
             match client.State.Username, client.State.CurrentRoom with
             | Some ourHandle, Some ourRoom when handle <> ourHandle && roomName = ourRoom ->
-                Console.SetCursorPosition(0, Console.CursorTop)
                 displayNotification $"{formatUserHandle handle} left {formatRoomName roomName}"
                 Console.Write("> ")
             | _ -> () // Don't show our own leave or leaves from other rooms
         
         | ErrorOccurred message ->
-            Console.SetCursorPosition(0, Console.CursorTop)
             displayError message
             Console.Write("> ")
         
         | ConnectionClosed ->
-            Console.SetCursorPosition(0, Console.CursorTop)
             displayError "Connection to server closed"
             running <- false
     
