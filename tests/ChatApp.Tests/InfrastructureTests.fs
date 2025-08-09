@@ -180,11 +180,49 @@ module SerializationTests =
         | Result.Error err -> Assert.Fail($"Deserialization failed: {err}")
     
     [<Fact>]
+    let ``Should serialize and deserialize ListUsers command with room`` () =
+        let room = createTestRoomName ()
+        let command = ListUsers (Some room)
+        
+        let json = JsonSerialization.serializeClientCommand command
+        let result = JsonSerialization.deserializeClientCommand json
+        
+        match result with
+        | Result.Ok deserializedCommand -> Assert.Equal(command, deserializedCommand)
+        | Result.Error err -> Assert.Fail($"Deserialization failed: {err}")
+    
+    [<Fact>]
+    let ``Should serialize and deserialize ListUsers command without room`` () =
+        let command = ListUsers None
+        
+        let json = JsonSerialization.serializeClientCommand command
+        let result = JsonSerialization.deserializeClientCommand json
+        
+        match result with
+        | Result.Ok deserializedCommand -> Assert.Equal(command, deserializedCommand)
+        | Result.Error err -> Assert.Fail($"Deserialization failed: {err}")
+    
+    [<Fact>]
     let ``Should serialize and deserialize RoomList server message`` () =
         let room1 = createTestRoomName ()
         let room2 = RoomName.create "random" |> getResultValue
         let roomList = [(room1, 5); (room2, 3)]
         let message = RoomList roomList
+        
+        let json = JsonSerialization.serializeServerMessage message
+        let result = JsonSerialization.deserializeServerMessage json
+        
+        match result with
+        | Result.Ok deserializedMessage -> Assert.Equal(message, deserializedMessage)
+        | Result.Error err -> Assert.Fail($"Deserialization failed: {err}")
+    
+    [<Fact>]
+    let ``Should serialize and deserialize UserList server message`` () =
+        let room = createTestRoomName ()
+        let user1 = createTestUserHandle ()
+        let user2 = UserHandle.create "bob" |> getResultValue
+        let users = [user1; user2]
+        let message = UserList (room, users)
         
         let json = JsonSerialization.serializeServerMessage message
         let result = JsonSerialization.deserializeServerMessage json
@@ -213,4 +251,3 @@ module SerializationTests =
         match result with
         | Result.Error _ -> () // Expected
         | Result.Ok command -> Assert.Fail($"Expected error but got command: {command}")
-        
