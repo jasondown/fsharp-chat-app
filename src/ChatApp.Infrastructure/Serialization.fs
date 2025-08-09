@@ -64,6 +64,18 @@ module JsonSerialization =
                     "type", Encode.string "GetRoomHistory"
                     "room", encodeRoomName room
                 ]
+            | ListUsers roomOption ->
+                match roomOption with
+                | Some room ->
+                    Encode.object [
+                        "type", Encode.string "ListUsers"
+                        "room", encodeRoomName room
+                    ]
+                | None ->
+                    Encode.object [
+                        "type", Encode.string "ListUsers"
+                        "room", Encode.nil
+                    ]
         
         let encodeServerMessage (message: ServerMessage) =
             match message with
@@ -104,6 +116,12 @@ module JsonSerialization =
                     "type", Encode.string "UserLeft"
                     "handle", encodeUserHandle handle
                     "room", encodeRoomName room
+                ]
+            | UserList (room, users) ->
+                Encode.object [
+                    "type", Encode.string "UserList"
+                    "room", encodeRoomName room
+                    "users", Encode.list (List.map encodeUserHandle users)
                 ]
             | Error errorMsg ->
                 Encode.object [
@@ -193,6 +211,11 @@ module JsonSerialization =
                         let room = get.Required.Field "room" roomNameDecoder
                         GetRoomHistory room
                     )
+                | "ListUsers" ->
+                    Decode.object (fun get ->
+                        let roomOption = get.Optional.Field "room" roomNameDecoder
+                        ListUsers roomOption
+                    )
                 | _ -> Decode.fail $"Unknown command type: {typeStr}"
             )
         
@@ -239,6 +262,12 @@ module JsonSerialization =
                         let handle = get.Required.Field "handle" userHandleDecoder
                         let room = get.Required.Field "room" roomNameDecoder
                         UserLeft (handle, room)
+                    )
+                | "UserList" ->
+                    Decode.object (fun get ->
+                        let room = get.Required.Field "room" roomNameDecoder
+                        let users = get.Required.Field "users" (Decode.list userHandleDecoder)
+                        UserList (room, users)
                     )
                 | "Error" ->
                     Decode.object (fun get ->
