@@ -25,6 +25,7 @@ type TerminalUI(client: ChatClient) as this =
     let mutable running = false
     let mutable inputTask: Task option = None
     let cts = new CancellationTokenSource()
+    let mutable isQuitting = false  // Track if we're quitting gracefully
     
     do
         client.OnEvent(fun event -> this.HandleClientEvent(event))
@@ -149,6 +150,7 @@ type TerminalUI(client: ChatClient) as this =
             | [| "clear" |] -> 
                 refreshUI client.State
             | [| "quit" |] | [| "exit" |] ->
+                isQuitting <- true  // Set flag before quitting
                 running <- false
             | _ -> 
                 displayError $"Unknown command: {input}"
@@ -214,7 +216,9 @@ type TerminalUI(client: ChatClient) as this =
             Console.Write("> ")
         
         | ConnectionClosed ->
-            displayError "Connection to server closed"
+            // Only show error if we're not quitting gracefully
+            if not isQuitting then
+                displayError "Connection to server closed"
             running <- false
     
     /// Start the terminal UI
