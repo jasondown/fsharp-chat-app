@@ -1,7 +1,5 @@
 module ChatApp.Tests.ClientTests
 
-open System
-open System.Net.Sockets
 open Xunit
 open ChatApp.Client
 open ChatApp.Domain.Types
