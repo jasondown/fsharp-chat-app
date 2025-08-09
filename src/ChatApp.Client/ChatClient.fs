@@ -22,6 +22,7 @@ type ClientEvent =
     | JoinedRoom of RoomName * Message list
     | LeftRoom of RoomName
     | RoomsListed of (RoomName * int) list
+    | UsersListed of RoomName * UserHandle list
     | UserJoinedRoom of UserHandle * RoomName
     | UserLeftRoom of UserHandle * RoomName
     | ErrorOccurred of string
@@ -136,6 +137,9 @@ type ChatClient(host: string, port: int) =
             clientState <- { clientState with AvailableRooms = rooms }
             this.TriggerEvent(RoomsListed rooms)
             
+        | UserList (roomName, users) ->
+            this.TriggerEvent(UsersListed (roomName, users))
+            
         | UserJoined (userHandle, roomName) ->
             this.TriggerEvent(UserJoinedRoom (userHandle, roomName))
             
@@ -208,6 +212,19 @@ type ChatClient(host: string, port: int) =
             this.TriggerEvent(ErrorOccurred $"Invalid room name: {err}")
             false
     
+    /// List users in current room
+    member this.ListUsersInCurrentRoom() =
+        this.SendCommand(ListUsers None)
+    
+    /// List users in specific room
+    member this.ListUsersInRoom(roomName: string) =
+        match RoomName.create roomName with
+        | Result.Ok roomNameObj ->
+            this.SendCommand(ListUsers (Some roomNameObj))
+        | Result.Error err ->
+            this.TriggerEvent(ErrorOccurred $"Invalid room name: {err}")
+            false
+    
     /// Set the username for this client session
     member this.SetUsername(username: string) =
         match UserHandle.create username with
@@ -222,4 +239,3 @@ type ChatClient(host: string, port: int) =
         member this.Dispose() =
             this.Disconnect()
             cancellationSource.Dispose()
-            
