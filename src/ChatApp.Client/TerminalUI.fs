@@ -68,15 +68,26 @@ type TerminalUI(client: ChatClient) as this =
         printfn $"{Color.bright}F# Chat Client{Color.reset} - User: {usernameStr} - {roomStr}"
         printfn $"""{String.replicate 60 "-"}"""
 
-    /// Display available commands
-    let displayCommands() =
+    /// Display available commands (pure: depends only on state)
+    let displayCommands (state: ClientState) =
         printfn $"{Color.bright}Commands:{Color.reset}"
-        printfn $"  /join <room>    - Join a chat room"
-        printfn $"  /leave          - Leave current room"
-        printfn $"  /list           - List available rooms"
-        printfn $"  /clear          - Clear the screen"
-        printfn $"  /quit           - Exit the application"
-        printfn $"  <message>       - Send message to current room"
+        match state.CurrentRoom with
+        | Some _ ->
+            // Commands when in a room
+            printfn $"  /leave          - Leave current room"
+            printfn $"  /list           - List available rooms"
+            printfn $"  /users          - List users in current room"
+            printfn $"  /users <room>   - List users in specified room"
+            printfn $"  /clear          - Clear the screen"
+            printfn $"  /quit           - Exit the application"
+            printfn $"  <message>       - Send message to current room"
+        | None ->
+            // Commands when not in a room
+            printfn $"  /join <room>    - Join a chat room"
+            printfn $"  /list           - List available rooms"
+            printfn $"  /users <room>   - List users in specified room"
+            printfn $"  /clear          - Clear the screen"
+            printfn $"  /quit           - Exit the application"
     
     /// Display the message history
     let displayMessages (messages: Message list) =
@@ -100,6 +111,17 @@ type TerminalUI(client: ChatClient) as this =
             |> List.iter (fun (roomName, participantCount) -> 
                 let name = formatRoomName roomName
                 printfn $"  {name} ({participantCount} participants)")
+    
+    /// Display the list of users in a room (curried args)
+    let displayUsers (roomName: RoomName) (users: UserHandle list) =
+        printfn $"{Color.bright}Users in {formatRoomName roomName}:{Color.reset}"
+        
+        if users.IsEmpty then
+            printfn "  No users in this room"
+        else
+            users
+            |> List.iter (fun userHandle -> 
+                printfn $"  {formatUserHandle userHandle}")
     
     /// Display an error message
     let displayError (message: string) =
@@ -126,7 +148,7 @@ type TerminalUI(client: ChatClient) as this =
                 displayRooms state.AvailableRooms
         
         printfn ""
-        displayCommands()
+        displayCommands state
         printfn ""
         Console.Write("> ")
     
@@ -147,6 +169,12 @@ type TerminalUI(client: ChatClient) as this =
                 client.LeaveRoom() |> ignore
             | [| "list" |] -> 
                 client.ListRooms() |> ignore
+            | [| "users" |] -> 
+                // List users in current room
+                client.ListUsersInCurrentRoom() |> ignore
+            | [| "users"; roomName |] -> 
+                // List users in specified room
+                client.ListUsersInRoom(roomName) |> ignore
             | [| "clear" |] -> 
                 refreshUI client.State
             | [| "quit" |] | [| "exit" |] ->
@@ -193,6 +221,11 @@ type TerminalUI(client: ChatClient) as this =
         | RoomsListed _rooms ->
             // Don't refresh UI for room list - just display the rooms inline
             displayRooms client.State.AvailableRooms
+            Console.Write("> ")
+        
+        | UsersListed (roomName, users) ->
+            // Display the users list inline
+            displayUsers roomName users
             Console.Write("> ")
         
         | UserJoinedRoom (handle, roomName) ->
