@@ -1,9 +1,6 @@
 namespace ChatApp.Application
 
-open System
-open System.Threading
 open ChatApp.Domain.Types
-open ChatApp.Domain.Protocol
 open FsToolkit.ErrorHandling
 
 /// Interface for room storage
@@ -72,3 +69,7 @@ type ChatService(roomRepository: IRoomRepository) =
             
             return room
         }
+    
+    /// Get a room by name
+    member _.GetRoom(roomName: string) : Result<Room, CommandError> =
+        roomRepository.GetRoom(roomName)

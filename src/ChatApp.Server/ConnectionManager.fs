@@ -45,7 +45,16 @@ type ConnectionManager(logger: ILogger) =
             | ex -> logger.Error(ex, "Exception sending message to client")
         }
         
-        let rec processClientCommand (connection: ClientConnection) (command: ClientCommand) = async {
+        // Helper function to get users in a specific room
+        let getUsersInRoom (connections: Map<Guid, ClientConnection>) (roomName: RoomName) =
+            connections
+            |> Map.values
+            |> Seq.choose (function
+                | { CurrentRoom = Some r; UserHandle = Some h } when r = roomName -> Some h
+                | _ -> None)
+            |> Seq.toList
+        
+        let rec processClientCommand (connections: Map<Guid, ClientConnection>) (connection: ClientConnection) (command: ClientCommand) = async {
             try
                 match command with
                 | JoinRoom (userHandle, roomName) ->
@@ -113,6 +122,32 @@ type ConnectionManager(logger: ILogger) =
                     let notImplementedMsg = ServerMessage.Error "GetRoomHistory not yet implemented"
                     do! sendMessageToClient connection.Client notImplementedMsg
                     return connection
+                    
+                | ListUsers roomOption ->
+                    match roomOption with
+                    | Some roomName ->
+                        match chatService.GetRoom(RoomName.value roomName) with
+                        | Result.Ok _ ->
+                            let users = getUsersInRoom connections roomName
+                            do! sendMessageToClient connection.Client (UserList (roomName, users))
+                            return connection
+                        | Result.Error err ->
+                            // log err somewhere server-side
+                            do! sendMessageToClient connection.Client (ServerMessage.Error $"Room '{RoomName.value roomName}' does not exist")
+                            return connection
+
+                    | None ->
+                        // List users in current room
+                        match connection.CurrentRoom with
+                        | Some currentRoom ->
+                            let users = getUsersInRoom connections currentRoom
+                            let userListMsg = UserList (currentRoom, users)
+                            do! sendMessageToClient connection.Client userListMsg
+                            return connection
+                        | None ->
+                            let errorMsg = ServerMessage.Error "Not currently in any room"
+                            do! sendMessageToClient connection.Client errorMsg
+                            return connection
                     
             with
             | ex ->
@@ -185,7 +220,7 @@ type ConnectionManager(logger: ILogger) =
                 
                 match connections.TryFind clientId with
                 | Some connection ->
-                    let! updatedConnection = processClientCommand connection command  
+                    let! updatedConnection = processClientCommand connections connection command  
                     let updatedConnections = connections.Add(clientId, updatedConnection)
                     return! loop updatedConnections
                 | None ->
