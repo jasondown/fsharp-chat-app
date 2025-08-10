@@ -23,6 +23,7 @@ type ClientEvent =
     | LeftRoom of RoomName
     | RoomsListed of (RoomName * int) list
     | UsersListed of RoomName * UserHandle list
+    | RoomHistoryReceived of RoomName * Message list
     | UserJoinedRoom of UserHandle * RoomName
     | UserLeftRoom of UserHandle * RoomName
     | ErrorOccurred of string
@@ -136,6 +137,14 @@ type ChatClient(host: string, port: int) =
         | RoomList rooms ->
             clientState <- { clientState with AvailableRooms = rooms }
             this.TriggerEvent(RoomsListed rooms)
+            
+        | RoomHistory (roomName, messages) ->
+            // Update room history if it's for the current room
+            match clientState.CurrentRoom with
+            | Some currentRoom when currentRoom = roomName ->
+                clientState <- { clientState with RoomHistory = messages }
+            | _ -> ()
+            this.TriggerEvent(RoomHistoryReceived (roomName, messages))
             
         | UserList (roomName, users) ->
             this.TriggerEvent(UsersListed (roomName, users))
