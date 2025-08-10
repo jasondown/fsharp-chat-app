@@ -123,6 +123,12 @@ module JsonSerialization =
                     "room", encodeRoomName room
                     "users", Encode.list (List.map encodeUserHandle users)
                 ]
+            | RoomHistory (room, messages) ->
+                Encode.object [
+                    "type", Encode.string "RoomHistory"
+                    "room", encodeRoomName room
+                    "messages", Encode.list (List.map encodeMessage messages)
+                ]
             | Error errorMsg ->
                 Encode.object [
                     "type", Encode.string "Error"
@@ -268,6 +274,12 @@ module JsonSerialization =
                         let room = get.Required.Field "room" roomNameDecoder
                         let users = get.Required.Field "users" (Decode.list userHandleDecoder)
                         UserList (room, users)
+                    )
+                | "RoomHistory" ->
+                    Decode.object (fun get ->
+                        let room = get.Required.Field "room" roomNameDecoder
+                        let messages = get.Required.Field "messages" (Decode.list messageDecoder)
+                        RoomHistory (room, messages)
                     )
                 | "Error" ->
                     Decode.object (fun get ->
