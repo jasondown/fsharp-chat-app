@@ -23,6 +23,7 @@ module Protocol =
         | UserJoined of UserHandle * RoomName    // Another user joined the room  
         | UserLeft of UserHandle * RoomName      // Another user left the room
         | UserList of RoomName * UserHandle list // Users in a specific room
+        | RoomHistory of RoomName * Message list // History for a specific room
         | Error of string                        // Error message
     
     /// Connection state events
