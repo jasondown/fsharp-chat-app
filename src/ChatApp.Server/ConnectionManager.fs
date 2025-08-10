@@ -119,9 +119,16 @@ type ConnectionManager(logger: ILogger) =
                         return connection
                         
                 | GetRoomHistory roomName ->
-                    let notImplementedMsg = ServerMessage.Error "GetRoomHistory not yet implemented"
-                    do! sendMessageToClient connection.Client notImplementedMsg
-                    return connection
+                    match chatService.GetRoom(RoomName.value roomName) with
+                    | Result.Ok room ->
+                        let messages = room.Messages
+                        let historyMsg = RoomHistory (roomName, messages)
+                        do! sendMessageToClient connection.Client historyMsg
+                        return connection
+                    | Result.Error err ->
+                        let errorMsg = ServerMessage.Error $"Room '{RoomName.value roomName}' does not exist"
+                        do! sendMessageToClient connection.Client errorMsg
+                        return connection
                     
                 | ListUsers roomOption ->
                     match roomOption with
