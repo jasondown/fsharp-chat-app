@@ -36,6 +36,11 @@ let createRoomName name =
     | Result.Ok room -> room
     | Result.Error err -> failwith $"Failed to create RoomName: {err}"
 
+let createMessageContent text =
+    match MessageContent.create text with
+    | Result.Ok content -> content
+    | Result.Error err -> failwith $"Failed to create MessageContent: {err}"
+
 /// Tests for ConnectionManager
 module ConnectionManagerTests =
     
@@ -252,6 +257,111 @@ module TcpChatServerTests =
             match response with
             | Result.Ok (ServerMessage.Error msg) -> 
                 Assert.Contains("not currently in any room", msg.ToLower())
+            | Result.Ok other -> 
+                Assert.Fail($"Expected Error but got: {other}")
+            | Result.Error err -> 
+                Assert.Fail($"Error reading server response: {err}")
+        }
+        
+        runServerForTest port testAction
+    
+    [<Fact>]
+    let ``TcpChatServer should handle GetRoomHistory for existing room`` () =
+        let port = 5006
+        
+        let testAction (_server: TcpChatServer) = async {
+            // Connect a client
+            use client = createTestClient(port)
+            
+            do! Async.Sleep(100)
+            
+            let alice = createUserHandle "alice"
+            let room = createRoomName "history-test"
+            
+            // Join the room
+            match TcpProtocol.sendClientCommand client (JoinRoom (alice, room)) with
+            | Result.Ok () -> ()
+            | Result.Error err -> Assert.Fail($"Failed to send join command: {err}")
+            
+            do! Async.Sleep(100)
+            
+            // Send some messages
+            let message1 = createMessageContent "Hello, world!"
+            let message2 = createMessageContent "This is a test"
+            
+            match TcpProtocol.sendClientCommand client (SendMessage (alice, room, message1)) with
+            | Result.Ok () -> ()
+            | Result.Error err -> Assert.Fail($"Failed to send message: {err}")
+            
+            match TcpProtocol.sendClientCommand client (SendMessage (alice, room, message2)) with
+            | Result.Ok () -> ()
+            | Result.Error err -> Assert.Fail($"Failed to send message: {err}")
+            
+            do! Async.Sleep(200) // Give server time to process messages
+            
+            // Helper to read messages until we get RoomHistory or timeout
+            let rec readUntilRoomHistory (client: TcpClient) (maxAttempts: int) =
+                if maxAttempts <= 0 then
+                    Assert.Fail("Timed out waiting for RoomHistory message")
+                    failwith "unreachable"
+                else
+                    match TcpProtocol.readServerMessage client with
+                    | Result.Ok (RoomHistory _ as msg) -> msg
+                    | Result.Ok _ -> 
+                        // Got a different message, keep reading
+                        readUntilRoomHistory client (maxAttempts - 1)
+                    | Result.Error err -> 
+                        Assert.Fail($"Error reading server response: {err}")
+                        failwith "unreachable"
+            
+            // Request room history
+            match TcpProtocol.sendClientCommand client (GetRoomHistory room) with
+            | Result.Ok () -> ()
+            | Result.Error err -> Assert.Fail($"Failed to send get history command: {err}")
+            
+            do! Async.Sleep(100)
+            
+            // Read messages until we get RoomHistory
+            let response = readUntilRoomHistory client 10
+            
+            match response with
+            | RoomHistory (returnedRoom, messages) -> 
+                Assert.Equal(room, returnedRoom)
+                Assert.True(List.length messages >= 2, "Should have at least 2 messages")
+                // Check that our messages are in the history
+                let messageContents = messages |> List.map (fun m -> MessageContent.value m.Content)
+                Assert.Contains("Hello, world!", messageContents)
+                Assert.Contains("This is a test", messageContents)
+            | other -> 
+                Assert.Fail($"Expected RoomHistory but got: {other}")
+        }
+        
+        runServerForTest port testAction
+    
+    [<Fact>]
+    let ``TcpChatServer should handle GetRoomHistory for non-existent room`` () =
+        let port = 5007
+        
+        let testAction (_server: TcpChatServer) = async {
+            use client = createTestClient(port)
+            
+            do! Async.Sleep(100)
+            
+            let nonExistentRoom = createRoomName "non-existent-history"
+            
+            // Request history for non-existent room
+            match TcpProtocol.sendClientCommand client (GetRoomHistory nonExistentRoom) with
+            | Result.Ok () -> ()
+            | Result.Error err -> Assert.Fail($"Failed to send get history command: {err}")
+            
+            do! Async.Sleep(100)
+            
+            // Should receive an error
+            let response = TcpProtocol.readServerMessage client
+            
+            match response with
+            | Result.Ok (ServerMessage.Error msg) -> 
+                Assert.Contains("does not exist", msg)
             | Result.Ok other -> 
                 Assert.Fail($"Expected Error but got: {other}")
             | Result.Error err -> 
