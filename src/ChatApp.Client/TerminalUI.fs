@@ -78,6 +78,7 @@ type TerminalUI(client: ChatClient) as this =
             printfn $"  /list           - List available rooms"
             printfn $"  /users          - List users in current room"
             printfn $"  /users <room>   - List users in specified room"
+            printfn $"  /history        - Reload room message history"
             printfn $"  /clear          - Clear the screen"
             printfn $"  /quit           - Exit the application"
             printfn $"  <message>       - Send message to current room"
@@ -175,6 +176,14 @@ type TerminalUI(client: ChatClient) as this =
             | [| "users"; roomName |] -> 
                 // List users in specified room
                 client.ListUsersInRoom(roomName) |> ignore
+            | [| "history" |] ->
+                // Reload history for current room
+                match client.State.CurrentRoom with
+                | Some room -> 
+                    client.GetRoomHistory(RoomName.value room) |> ignore
+                | None ->
+                    displayError "Not currently in a room"
+                    Console.Write("> ")
             | [| "clear" |] -> 
                 refreshUI client.State
             | [| "quit" |] | [| "exit" |] ->
@@ -226,6 +235,12 @@ type TerminalUI(client: ChatClient) as this =
         | UsersListed (roomName, users) ->
             // Display the users list inline
             displayUsers roomName users
+            Console.Write("> ")
+        
+        | RoomHistoryReceived roomName ->
+            // Refresh UI to show updated history
+            refreshUI client.State
+            displayNotification $"Reloaded history for {formatRoomName roomName}"
             Console.Write("> ")
         
         | UserJoinedRoom (handle, roomName) ->
