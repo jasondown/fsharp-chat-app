@@ -369,3 +369,231 @@ module TcpChatServerTests =
         }
         
         runServerForTest port testAction
+    
+    [<Fact>]
+    let ``TcpChatServer should auto-leave current room when joining different room`` () =
+        let port = 5008
+        
+        let testAction (_server: TcpChatServer) = async {
+            // Connect three clients
+            use client1 = createTestClient(port) // Alice - will switch rooms
+            use client2 = createTestClient(port) // Bob - stays in room1
+            use client3 = createTestClient(port) // Charlie - in room2
+            
+            do! Async.Sleep(100)
+            
+            let alice = createUserHandle "alice"
+            let bob = createUserHandle "bob"
+            let charlie = createUserHandle "charlie"
+            let room1 = createRoomName "room1"
+            let room2 = createRoomName "room2"
+            
+            // Alice and Bob join room1
+            match TcpProtocol.sendClientCommand client1 (JoinRoom (alice, room1)) with
+            | Result.Ok () -> ()
+            | Result.Error err -> Assert.Fail($"Failed to send join command: {err}")
+            
+            match TcpProtocol.sendClientCommand client2 (JoinRoom (bob, room1)) with
+            | Result.Ok () -> ()
+            | Result.Error err -> Assert.Fail($"Failed to send join command: {err}")
+            
+            // Charlie joins room2
+            match TcpProtocol.sendClientCommand client3 (JoinRoom (charlie, room2)) with
+            | Result.Ok () -> ()
+            | Result.Error err -> Assert.Fail($"Failed to send join command: {err}")
+            
+            do! Async.Sleep(200) // Give server time to process joins
+            
+            // Clear any existing messages
+            let clearMessages (client: TcpClient) =
+                let mutable ``continue`` = true
+                while ``continue`` do
+                    client.Client.Poll(100, SelectMode.SelectRead) |> ignore
+                    if client.Available > 0 then
+                        TcpProtocol.readServerMessage client |> ignore
+                    else
+                        ``continue`` <- false
+            
+            clearMessages client1
+            clearMessages client2
+            clearMessages client3
+            
+            // Now Alice switches from room1 to room2
+            match TcpProtocol.sendClientCommand client1 (JoinRoom (alice, room2)) with
+            | Result.Ok () -> ()
+            | Result.Error err -> Assert.Fail($"Failed to send join command: {err}")
+            
+            do! Async.Sleep(200) // Give server time to process
+            
+            // Bob should receive a UserLeft notification in room1
+            let rec checkForUserLeft (client: TcpClient) (attempts: int) =
+                if attempts <= 0 then
+                    false
+                else
+                    match TcpProtocol.readServerMessage client with
+                    | Result.Ok (UserLeft (user, room)) when user = alice && room = room1 -> true
+                    | _ -> checkForUserLeft client (attempts - 1)
+            
+            Assert.True(checkForUserLeft client2 5, "Bob should receive UserLeft notification for Alice in room1")
+            
+            // Charlie should receive a UserJoined notification in room2
+            let rec checkForUserJoined (client: TcpClient) (attempts: int) =
+                if attempts <= 0 then
+                    false
+                else
+                    match TcpProtocol.readServerMessage client with
+                    | Result.Ok (UserJoined (user, room)) when user = alice && room = room2 -> true
+                    | _ -> checkForUserJoined client (attempts - 1)
+            
+            Assert.True(checkForUserJoined client3 5, "Charlie should receive UserJoined notification for Alice in room2")
+            
+            // Verify room participants
+            match TcpProtocol.sendClientCommand client2 (ListUsers (Some room1)) with
+            | Result.Ok () -> ()
+            | Result.Error err -> Assert.Fail($"Failed to send list users command: {err}")
+            
+            do! Async.Sleep(100)
+            
+            let rec readUntilUserList (client: TcpClient) (maxAttempts: int) =
+                if maxAttempts <= 0 then
+                    failwith "Timed out waiting for UserList"
+                else
+                    match TcpProtocol.readServerMessage client with
+                    | Result.Ok (UserList _ as msg) -> msg
+                    | Result.Ok _ -> readUntilUserList client (maxAttempts - 1)
+                    | Result.Error err -> failwith $"Error reading: {err}"
+            
+            match readUntilUserList client2 10 with
+            | UserList (_, users) ->
+                Assert.Equal(1, List.length users)
+                Assert.Contains(bob, users)
+                Assert.DoesNotContain(alice, users)
+            | _ -> Assert.Fail("Expected UserList")
+            
+            // Check room2 participants
+            match TcpProtocol.sendClientCommand client3 (ListUsers (Some room2)) with
+            | Result.Ok () -> ()
+            | Result.Error err -> Assert.Fail($"Failed to send list users command: {err}")
+            
+            do! Async.Sleep(100)
+            
+            match readUntilUserList client3 10 with
+            | UserList (_, users) ->
+                Assert.Equal(2, List.length users)
+                Assert.Contains(charlie, users)
+                Assert.Contains(alice, users)
+            | _ -> Assert.Fail("Expected UserList")
+        }
+        
+        runServerForTest port testAction
+    
+    [<Fact>]
+    let ``TcpChatServer should handle idempotent join to same room`` () =
+        let port = 5009
+        
+        let testAction (_server: TcpChatServer) = async {
+            use client = createTestClient(port)
+            
+            do! Async.Sleep(100)
+            
+            let alice = createUserHandle "alice"
+            let room = createRoomName "test-room"
+            let messageContent = createMessageContent "Test message"
+            
+            // Join room first time
+            match TcpProtocol.sendClientCommand client (JoinRoom (alice, room)) with
+            | Result.Ok () -> ()
+            | Result.Error err -> Assert.Fail($"Failed to send join command: {err}")
+            
+            do! Async.Sleep(100)
+            
+            // Send a message
+            match TcpProtocol.sendClientCommand client (SendMessage (alice, room, messageContent)) with
+            | Result.Ok () -> ()
+            | Result.Error err -> Assert.Fail($"Failed to send message: {err}")
+            
+            do! Async.Sleep(100)
+            
+            // Clear any pending messages
+            while client.Available > 0 do
+                TcpProtocol.readServerMessage client |> ignore
+            
+            // Join the same room again (should be idempotent)
+            match TcpProtocol.sendClientCommand client (JoinRoom (alice, room)) with
+            | Result.Ok () -> ()
+            | Result.Error err -> Assert.Fail($"Failed to send join command: {err}")
+            
+            do! Async.Sleep(100)
+            
+            // Should receive JoinedRoom with message history
+            let rec findJoinedRoom (attempts: int) =
+                if attempts <= 0 then
+                    failwith "Timed out waiting for JoinedRoom"
+                else
+                    match TcpProtocol.readServerMessage client with
+                    | Result.Ok (JoinedRoom (roomName, messages)) -> (roomName, messages)
+                    | Result.Ok _ -> findJoinedRoom (attempts - 1)
+                    | Result.Error err -> failwith $"Error reading: {err}"
+            
+            let joinedRoom, messages = findJoinedRoom 5
+            Assert.Equal(room, joinedRoom)
+            Assert.True(List.length messages >= 1, "Should have at least the message we sent")
+            
+            // Verify we're still in the room by sending another message
+            let messageContent2 = createMessageContent "Still here"
+            match TcpProtocol.sendClientCommand client (SendMessage (alice, room, messageContent2)) with
+            | Result.Ok () -> ()
+            | Result.Error err -> Assert.Fail($"Should still be able to send messages: {err}")
+        }
+        
+        runServerForTest port testAction
+    
+    [<Fact>]
+    let ``TcpChatServer should not send duplicate notifications for idempotent join`` () =
+        let port = 5010
+        
+        let testAction (_server: TcpChatServer) = async {
+            // Connect two clients
+            use client1 = createTestClient(port) // Alice
+            use client2 = createTestClient(port) // Bob - will monitor notifications
+            
+            do! Async.Sleep(100)
+            
+            let alice = createUserHandle "alice"
+            let bob = createUserHandle "bob"
+            let room = createRoomName "notification-test"
+            
+            // Both join the room
+            match TcpProtocol.sendClientCommand client1 (JoinRoom (alice, room)) with
+            | Result.Ok () -> ()
+            | Result.Error err -> Assert.Fail($"Failed to send join command: {err}")
+            
+            match TcpProtocol.sendClientCommand client2 (JoinRoom (bob, room)) with
+            | Result.Ok () -> ()
+            | Result.Error err -> Assert.Fail($"Failed to send join command: {err}")
+            
+            do! Async.Sleep(200)
+            
+            // Clear Bob's message queue
+            while client2.Available > 0 do
+                TcpProtocol.readServerMessage client2 |> ignore
+            
+            // Alice joins the same room again
+            match TcpProtocol.sendClientCommand client1 (JoinRoom (alice, room)) with
+            | Result.Ok () -> ()
+            | Result.Error err -> Assert.Fail($"Failed to send join command: {err}")
+            
+            do! Async.Sleep(200)
+            
+            // Bob should NOT receive any UserJoined notification for Alice
+            let mutable receivedUserJoined = false
+            while client2.Available > 0 do
+                match TcpProtocol.readServerMessage client2 with
+                | Result.Ok (UserJoined (user, _)) when user = alice ->
+                    receivedUserJoined <- true
+                | _ -> ()
+            
+            Assert.False(receivedUserJoined, "Bob should not receive UserJoined for Alice's idempotent join")
+        }
+        
+        runServerForTest port testAction

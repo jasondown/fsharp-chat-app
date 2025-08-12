@@ -58,22 +58,78 @@ type ConnectionManager(logger: ILogger) =
             try
                 match command with
                 | JoinRoom (userHandle, roomName) ->
-                    match chatService.JoinRoom(UserHandle.value userHandle, RoomName.value roomName) with
-                    | Result.Ok (joinedRoomName, messageHistory) ->
-                        // Send room history to the joining client
-                        let joinedMsg = JoinedRoom (joinedRoomName, messageHistory)
-                        do! sendMessageToClient connection.Client joinedMsg
+                    // Check if user is already in the requested room (idempotent behavior)
+                    match connection.CurrentRoom with
+                    | Some currentRoom when currentRoom = roomName ->
+                        // User is already in this room - just acknowledge it
+                        logger.Information("User {User} already in room {Room} - no action needed", 
+                                          UserHandle.value userHandle, 
+                                          RoomName.value roomName)
                         
-                        // Notify other users in the room
-                        let userJoinedMsg = UserJoined (userHandle, roomName)
-                        inbox.Post(BroadcastToRoom (roomName, userJoinedMsg))
+                        // Get the current room state and send it back to confirm
+                        match chatService.GetRoom(RoomName.value roomName) with
+                        | Result.Ok room ->
+                            let joinedMsg = JoinedRoom (roomName, room.Messages)
+                            do! sendMessageToClient connection.Client joinedMsg
+                            return connection
+                        | Result.Error _ ->
+                            // This shouldn't happen if CurrentRoom is set, but handle it gracefully
+                            let errorMsg = ServerMessage.Error $"Inconsistent state: room '{RoomName.value roomName}' not found"
+                            do! sendMessageToClient connection.Client errorMsg
+                            return { connection with CurrentRoom = None }
+                    
+                    | Some currentRoom ->
+                        // User is switching rooms - need to leave current room first
+                        logger.Information("User {User} switching from room {OldRoom} to {NewRoom}", 
+                                          UserHandle.value userHandle, 
+                                          RoomName.value currentRoom, 
+                                          RoomName.value roomName)
                         
-                        // Update connection to track user and room
-                        return { connection with UserHandle = Some userHandle; CurrentRoom = Some roomName }
-                    | Result.Error err ->
-                        let errorMsg = ServerMessage.Error $"Failed to join room: {err}"
-                        do! sendMessageToClient connection.Client errorMsg
-                        return connection
+                        match chatService.LeaveRoom(UserHandle.value userHandle, RoomName.value currentRoom) with
+                        | Result.Ok _ ->
+                            // Notify users in the old room
+                            let userLeftMsg = UserLeft (userHandle, currentRoom)
+                            inbox.Post(BroadcastToRoom (currentRoom, userLeftMsg))
+                            
+                            // Now proceed with joining the new room
+                            match chatService.JoinRoom(UserHandle.value userHandle, RoomName.value roomName) with
+                            | Result.Ok (joinedRoomName, messageHistory) ->
+                                let joinedMsg = JoinedRoom (joinedRoomName, messageHistory)
+                                do! sendMessageToClient connection.Client joinedMsg
+                                
+                                let userJoinedMsg = UserJoined (userHandle, roomName)
+                                inbox.Post(BroadcastToRoom (roomName, userJoinedMsg))
+                                
+                                return { connection with UserHandle = Some userHandle; CurrentRoom = Some roomName }
+                            | Result.Error err ->
+                                let errorMsg = ServerMessage.Error $"Failed to join room: {err}"
+                                do! sendMessageToClient connection.Client errorMsg
+                                return { connection with CurrentRoom = None }
+                        
+                        | Result.Error err ->
+                            logger.Warning("Failed to auto-leave room {Room} for user {User}: {Error}", 
+                                          RoomName.value currentRoom, 
+                                          UserHandle.value userHandle, 
+                                          err)
+                            let errorMsg = ServerMessage.Error $"Failed to leave current room: {err}"
+                            do! sendMessageToClient connection.Client errorMsg
+                            return connection
+                    
+                    | None ->
+                        // User is not in any room - proceed with joining
+                        match chatService.JoinRoom(UserHandle.value userHandle, RoomName.value roomName) with
+                        | Result.Ok (joinedRoomName, messageHistory) ->
+                            let joinedMsg = JoinedRoom (joinedRoomName, messageHistory)
+                            do! sendMessageToClient connection.Client joinedMsg
+                            
+                            let userJoinedMsg = UserJoined (userHandle, roomName)
+                            inbox.Post(BroadcastToRoom (roomName, userJoinedMsg))
+                            
+                            return { connection with UserHandle = Some userHandle; CurrentRoom = Some roomName }
+                        | Result.Error err ->
+                            let errorMsg = ServerMessage.Error $"Failed to join room: {err}"
+                            do! sendMessageToClient connection.Client errorMsg
+                            return connection
                         
                 | LeaveRoom userHandle ->
                     match connection.CurrentRoom with

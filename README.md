@@ -209,6 +209,13 @@ tree -I '[Bb]in|[Oo]bj'
    - Added `isQuitting` flag to track graceful shutdown
    - Connection closed errors now only show for unexpected disconnections
    - Improves user experience when exiting the application normally
+
+#### Room Switching Without Leavec
+   - Fixed issue where joining a new room without leaving current room caused incorrect participant counts
+   - Users now automatically leave their current room when joining a different room
+   - Implemented idempotent behavior when rejoining the same room (no duplicate notifications)
+   - Updated UI to show `/join` command is available when in a room with "(leaves current)" clarification
+   - Added comprehensive tests for room switching behavior
   
 ### How to Run
 
@@ -255,13 +262,12 @@ dotnet run --project src/ChatApp.Client/ -- --username charlie --room general
 1. **Messages are stored newest-first** (prepended to list)
 2. **No rate limiting** or spam protection
 3. **No maximum room/message limits**
-4. **Room switching without leave** - When a user joins a new room without leaving their current room, the participant count in the first room remains incorrect (user is still counted but doesn't appear in `/users` list). The system doesn't broadcast a leave notification to the first room's participants. Need to decide whether to support multi-room membership or enforce single-room occupancy.
 
 ## Test Coverage
 
 - **Domain Layer**: 6 tests (validation logic)
 - **Infrastructure Layer**: 13 tests (repository, serialization, ListUsers/UserList)
 - **Application Layer**: 9 tests (business logic, room creation, GetRoom)
-- **Server Layer**: 13 tests (connection management, TCP communication, ListUsers handling, GetRoomHistory)
+- **Server Layer**: 16 tests (connection management, TCP communication, ListUsers handling, GetRoomHistory, room switching)
 - **Client Layer**: 10 tests (username management, ListUsers methods, GetRoomHistory)
-- **Total**: 51 tests, all passing
+- **Total**: 54 tests, all passing
