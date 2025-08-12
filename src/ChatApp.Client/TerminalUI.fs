@@ -74,6 +74,7 @@ type TerminalUI(client: ChatClient) as this =
         match state.CurrentRoom with
         | Some _ ->
             // Commands when in a room
+            printfn $"  /join <room>    - Join a different room (leaves current room)"
             printfn $"  /leave          - Leave current room"
             printfn $"  /list           - List available rooms"
             printfn $"  /users          - List users in current room"
