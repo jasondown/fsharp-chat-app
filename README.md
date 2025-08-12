@@ -210,7 +210,7 @@ tree -I '[Bb]in|[Oo]bj'
    - Connection closed errors now only show for unexpected disconnections
    - Improves user experience when exiting the application normally
 
-#### Room Switching Without Leavec
+#### Room Switching Without Leaving
    - Fixed issue where joining a new room without leaving current room caused incorrect participant counts
    - Users now automatically leave their current room when joining a different room
    - Implemented idempotent behavior when rejoining the same room (no duplicate notifications)
